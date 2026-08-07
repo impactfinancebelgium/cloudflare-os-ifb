@@ -18,6 +18,7 @@ const generatedPaths = {
   twentyGatekeeper: join(root, "packages/twenty-gatekeeper", generatedName),  // IFB: CRM read-only
   websiteGatekeeper: join(root, "packages/website-gatekeeper", generatedName),  // IFB: website proposals
   sharepointGatekeeper: join(root, "packages/sharepoint-gatekeeper", generatedName),  // IFB: docs read-only
+  survey: join(root, "packages/survey", generatedName),  // IFB: member survey app (D1)
 };
 
 const requiredPaths = [
@@ -76,6 +77,10 @@ const websiteGatekeeperPaths = [
 const sharepointGatekeeperPaths = [
   "workers.sharepointGatekeeper.name",
 ];
+// IFB: the survey app is optional, like the other IFB workers.
+const surveyPaths = [
+  "workers.survey.name",
+];
 
 const resourcePaths = [
   "context.kvNamespaceId",
@@ -98,6 +103,7 @@ export function validateConfig(config) {
     ...(config.twentyGatekeeper?.enabled ? twentyGatekeeperPaths : []),
     ...(config.websiteGatekeeper?.enabled ? websiteGatekeeperPaths : []),
     ...(config.sharepointGatekeeper?.enabled ? sharepointGatekeeperPaths : []),
+    ...(config.survey?.enabled ? surveyPaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -159,6 +165,7 @@ export function validateConfig(config) {
     .filter(([key]) => key !== "twentyGatekeeper" || config.twentyGatekeeper?.enabled)
     .filter(([key]) => key !== "websiteGatekeeper" || config.websiteGatekeeper?.enabled)
     .filter(([key]) => key !== "sharepointGatekeeper" || config.sharepointGatekeeper?.enabled)
+    .filter(([key]) => key !== "survey" || config.survey?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -293,6 +300,9 @@ export function generateConfigs(config, bases) {
   const sharepointGatekeeper = config.sharepointGatekeeper?.enabled
     ? structuredClone(bases.sharepointGatekeeper)
     : undefined;
+  const survey = config.survey?.enabled
+    ? structuredClone(bases.survey)
+    : undefined;
 
   setCommon(workshop, config, config.workers.workshop.name, config.workers.workshop.route);
   workshop.vars = {
@@ -420,11 +430,17 @@ export function generateConfigs(config, bases) {
     };
   }
 
+  if (survey) {
+    // Member-facing on workers.dev for the MVP; a custom hostname is a deliberate later step.
+    setCommon(survey, config, config.workers.survey.name, { workersDev: true });
+  }
+
   return { workshop, context, customGatekeeper,
     ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }),
     ...(edge && { edge }), ...(twentyGatekeeper && { twentyGatekeeper }),
     ...(websiteGatekeeper && { websiteGatekeeper }),
-    ...(sharepointGatekeeper && { sharepointGatekeeper }) };
+    ...(sharepointGatekeeper && { sharepointGatekeeper }),
+    ...(survey && { survey }) };
 }
 
 async function readJsonc(path) {
@@ -503,6 +519,7 @@ async function main() {
     twentyGatekeeper: await readJsonc(join(root, "packages/twenty-gatekeeper/wrangler.jsonc")),
     websiteGatekeeper: await readJsonc(join(root, "packages/website-gatekeeper/wrangler.jsonc")),
     sharepointGatekeeper: await readJsonc(join(root, "packages/sharepoint-gatekeeper/wrangler.jsonc")),
+    survey: await readJsonc(join(root, "packages/survey/wrangler.jsonc")),
   });
 
   try {
@@ -544,6 +561,10 @@ async function main() {
     if (config.edge?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/edge"));
+    }
+    if (config.survey?.enabled) {
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/survey"));
     }
   } finally {
     await Promise.all(Object.values(generatedPaths).map((path) => rm(path, { force: true })));

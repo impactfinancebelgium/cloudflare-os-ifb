@@ -21,7 +21,8 @@
     "edge": { "name": "ifb-os-edge" },
     "twentyGatekeeper": { "name": "ifb-os-twenty-gatekeeper" },
     "websiteGatekeeper": { "name": "ifb-os-website-gatekeeper" },
-    "sharepointGatekeeper": { "name": "ifb-os-sharepoint-gatekeeper" }
+    "sharepointGatekeeper": { "name": "ifb-os-sharepoint-gatekeeper" },
+    "survey": { "name": "ifb-os-survey" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -95,6 +96,10 @@
   // client credentials via the "IFB Workspace" Entra app; Sites.Selected confines it
   // to the IFB site. Secret on the worker: MS_CLIENT_SECRET (IFB vault).
   "sharepointGatekeeper": { "enabled": true },
+
+  // IFB: member survey app (packages/survey). Worker + D1 `ifb-survey` (region WEUR).
+  // Member auth is signed invite tokens, never Cloudflare Access (per-seat cost).
+  "survey": { "enabled": true },
 
   "errorReporting": {
     "enabled": true,
