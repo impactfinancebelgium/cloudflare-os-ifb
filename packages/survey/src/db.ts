@@ -60,6 +60,12 @@ export async function roundMeta(db: D1Database, roundId: string) {
   ).bind(roundId).first();
 }
 
+export async function orgName(db: D1Database, orgId: string): Promise<string | null> {
+  const row = await db.prepare(`SELECT name FROM survey_org WHERE id = ?1`)
+    .bind(orgId).first<{ name: string }>();
+  return row?.name ?? null;
+}
+
 export async function questions(db: D1Database, roundId: string): Promise<Question[]> {
   const rs = await db.prepare(
     `SELECT code, section, block, position, label, qtype, options, display_if, help

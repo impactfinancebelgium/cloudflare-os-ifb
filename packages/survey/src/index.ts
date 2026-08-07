@@ -18,6 +18,7 @@
 
 import * as db from "./db";
 import { mintToken, sha256Hex, verifyToken } from "./token";
+import { formPage } from "./ui";
 
 export interface Env {
   DB: D1Database;
@@ -136,16 +137,19 @@ export default {
       return json({ error: "not_found" }, 404);
     }
 
-    // ---- human form (full UI in a later milestone) --------------------------
+    // ---- human form ---------------------------------------------------------
     if (path.startsWith("/r/")) {
       const auth = await authenticate(request, env);
       if (!auth) {
         return new Response("This invite link is invalid or has expired. Contact IFB for a fresh link.",
           { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
       }
+      const [meta, org] = await Promise.all([
+        db.roundMeta(env.DB, auth.roundId), db.orgName(env.DB, auth.orgId),
+      ]);
       return new Response(
-        `Invite verified for your organisation. The form UI ships in the next milestone; agents can already use /api/schema, /api/draft, /api/submit with this link's token.`,
-        { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
+        formPage(org ?? auth.orgId, (meta as { label?: string })?.label ?? "Market survey"),
+        { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
     }
 
     if (path === "/") {
