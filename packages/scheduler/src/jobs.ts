@@ -52,16 +52,14 @@ export const JOBS: Job[] = [
     enabled: true,
     action: { type: "fetch", url: "https://crm.impactfinance.be/", okStatuses: [302] },
   },
-  // --- Staged, DISABLED until Jonas approves the cutover -----------------------------
-  // Replaces the Supabase pg_cron + Edge Function newsletter sync. The edge worker
-  // reads the cohort from Twenty CRM (the human source of truth) and pushes it to
-  // Resend; it also 503s until EDGE_ENABLED is flipped, so enabling this job is only
-  // half of the cutover.
+  // Replaces the Supabase pg_cron + Edge Function newsletter sync (cutover approved
+  // by Jonas 2026-08-08). The edge worker reads the cohort from Twenty CRM (the human
+  // source of truth) and pushes it to Resend.
   {
     id: "resend-contact-sync",
-    description: "STAGED: hourly Twenty -> Resend newsletter contact sync.",
+    description: "Hourly Twenty -> Resend newsletter contact sync.",
     cron: "0 * * * *",
-    enabled: false,
+    enabled: true,
     action: {
       type: "fetch",
       url: "https://ifb-os-edge.impact-finance-belgium.workers.dev/sync-contacts-to-resend",

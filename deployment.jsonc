@@ -75,7 +75,7 @@
   // to true (plus repointing the website + Resend webhook) is the cutover decision.
   "edge": {
     "enabled": true,
-    "cutover": false,
+    "cutover": true,  // Jonas approved the Supabase cutover 2026-08-08
     "supabaseUrl": "https://bogiknzxejjhndthnzgg.supabase.co",
     "resendAudienceId": "bb256ad9-171a-4293-a631-212a15668bc6",
     "twentyBaseUrl": "https://crm.impactfinance.be"
