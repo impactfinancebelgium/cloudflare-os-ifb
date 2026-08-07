@@ -16,6 +16,7 @@ const generatedPaths = {
   scheduler: join(root, "packages/scheduler", generatedName),  // IFB: job scheduling
   edge: join(root, "packages/edge", generatedName),  // IFB: staged Supabase-exit worker
   twentyGatekeeper: join(root, "packages/twenty-gatekeeper", generatedName),  // IFB: CRM read-only
+  websiteGatekeeper: join(root, "packages/website-gatekeeper", generatedName),  // IFB: website proposals
 };
 
 const requiredPaths = [
@@ -65,6 +66,11 @@ const twentyGatekeeperPaths = [
   "workers.twentyGatekeeper.name",
 ];
 
+// IFB: the website change-proposal gatekeeper is optional too.
+const websiteGatekeeperPaths = [
+  "workers.websiteGatekeeper.name",
+];
+
 const resourcePaths = [
   "context.kvNamespaceId",
   "resources.blueprintsKvNamespaceId",
@@ -84,6 +90,7 @@ export function validateConfig(config) {
     ...(config.scheduler?.enabled ? schedulerPaths : []),
     ...(config.edge?.enabled ? edgePaths : []),
     ...(config.twentyGatekeeper?.enabled ? twentyGatekeeperPaths : []),
+    ...(config.websiteGatekeeper?.enabled ? websiteGatekeeperPaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -143,6 +150,7 @@ export function validateConfig(config) {
     .filter(([key]) => key !== "scheduler" || config.scheduler?.enabled)
     .filter(([key]) => key !== "edge" || config.edge?.enabled)
     .filter(([key]) => key !== "twentyGatekeeper" || config.twentyGatekeeper?.enabled)
+    .filter(([key]) => key !== "websiteGatekeeper" || config.websiteGatekeeper?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -271,6 +279,9 @@ export function generateConfigs(config, bases) {
   const twentyGatekeeper = config.twentyGatekeeper?.enabled
     ? structuredClone(bases.twentyGatekeeper)
     : undefined;
+  const websiteGatekeeper = config.websiteGatekeeper?.enabled
+    ? structuredClone(bases.websiteGatekeeper)
+    : undefined;
 
   setCommon(workshop, config, config.workers.workshop.name, config.workers.workshop.route);
   workshop.vars = {
@@ -330,6 +341,11 @@ export function generateConfigs(config, bases) {
       service: config.workers.scheduler.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
+    ...(config.websiteGatekeeper?.enabled ? [{
+      binding: "GATEKEEPER_WEBSITE",
+      service: config.workers.websiteGatekeeper.name,
+      entrypoint: "GatekeeperVendor",
+    }] : []),
   ];
   workshop.kv_namespaces = [
     { binding: "BLUEPRINTS", ...(config.resources.blueprintsKvNamespaceId
@@ -368,6 +384,9 @@ export function generateConfigs(config, bases) {
   if (twentyGatekeeper) {
     setCommon(twentyGatekeeper, config, config.workers.twentyGatekeeper.name);
   }
+  if (websiteGatekeeper) {
+    setCommon(websiteGatekeeper, config, config.workers.websiteGatekeeper.name);
+  }
   if (edge) {
     // workers.dev route so the staged worker is reachable for verification; a live
     // hostname only arrives at cutover.
@@ -384,7 +403,8 @@ export function generateConfigs(config, bases) {
 
   return { workshop, context, customGatekeeper,
     ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }),
-    ...(edge && { edge }), ...(twentyGatekeeper && { twentyGatekeeper }) };
+    ...(edge && { edge }), ...(twentyGatekeeper && { twentyGatekeeper }),
+    ...(websiteGatekeeper && { websiteGatekeeper }) };
 }
 
 async function readJsonc(path) {
@@ -437,6 +457,9 @@ function build(config) {
   if (config.twentyGatekeeper?.enabled) {
     run(["--dir", "packages/twenty-gatekeeper", "run", "build"]);
   }
+  if (config.websiteGatekeeper?.enabled) {
+    run(["--dir", "packages/website-gatekeeper", "run", "build"]);
+  }
   run(["--dir", "cloudflare-os", "--filter", "@gadgets/workshop-frontend", "build"], root, {
     ...process.env,
     VITE_CF_ACCESS_MODE: "true",
@@ -455,6 +478,7 @@ async function main() {
     scheduler: await readJsonc(join(root, "packages/scheduler/wrangler.jsonc")),
     edge: await readJsonc(join(root, "packages/edge/wrangler.jsonc")),
     twentyGatekeeper: await readJsonc(join(root, "packages/twenty-gatekeeper/wrangler.jsonc")),
+    websiteGatekeeper: await readJsonc(join(root, "packages/website-gatekeeper/wrangler.jsonc")),
   });
 
   try {
@@ -482,6 +506,10 @@ async function main() {
       // Also before the workshop: it binds GATEKEEPER_SCHEDULER to this service.
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/scheduler"));
+    }
+    if (config.websiteGatekeeper?.enabled) {
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/website-gatekeeper"));
     }
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));

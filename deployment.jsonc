@@ -19,7 +19,8 @@
     "errorReporter": { "name": "ifb-os-errors" },
     "scheduler": { "name": "ifb-os-scheduler" },
     "edge": { "name": "ifb-os-edge" },
-    "twentyGatekeeper": { "name": "ifb-os-twenty-gatekeeper" }
+    "twentyGatekeeper": { "name": "ifb-os-twenty-gatekeeper" },
+    "websiteGatekeeper": { "name": "ifb-os-website-gatekeeper" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -83,6 +84,11 @@
   // ifb-os-twenty-gatekeeper worker: TWENTY_API_KEY + the ifb-os-twenty Access service
   // token pair (all in the IFB 1Password vault).
   "twentyGatekeeper": { "enabled": true },
+
+  // IFB: website change-proposal gatekeeper (packages/website-gatekeeper). Reads the
+  // public website repo; writes only as human-approved review branches. Secret on the
+  // worker: WEBSITE_GITHUB_TOKEN (org fine-grained PAT from the IFB vault).
+  "websiteGatekeeper": { "enabled": true },
 
   "errorReporting": {
     "enabled": true,
