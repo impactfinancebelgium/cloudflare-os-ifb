@@ -389,11 +389,17 @@ export function generateConfigs(config, bases) {
     run_worker_first: ["/api", "/api/*", "/blueprint-screenshot/*"],
   };
 
-  setCommon(context, config, config.workers.context.name);
+  // IFB: workers.dev route exposes the fork's bearer-secret /admin-api (programmatic
+  // collection management); the Artifacts binding enables git-backed collections.
+  setCommon(context, config, config.workers.context.name, { workersDev: true });
   context.kv_namespaces = [
     { binding: "CONTEXT_COLLECTIONS", ...(config.context.kvNamespaceId
       ? { id: config.context.kvNamespaceId } : {}) },
   ];
+  context.artifacts = [
+    { binding: "ARTIFACTS", namespace: config.context.artifactsNamespace ?? "ifb-os-context" },
+  ];
+  context.vars = { SHARING_DOMAIN: config.context.sharingDomain };
 
   setCommon(customGatekeeper, config, config.workers.customGatekeeper.name);
   customGatekeeper.vars = {
