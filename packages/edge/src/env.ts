@@ -3,8 +3,14 @@
 // answers 503 and the worker can have no side effects, so it is safe to deploy staged.
 export type Env = {
   EDGE_ENABLED?: string;
+  // Supabase: still used by submit-application (applications DB) until the DB exit.
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  // Twenty CRM: cohort source + unsubscribe target for the newsletter sync.
+  TWENTY_BASE_URL?: string;
+  TWENTY_API_KEY?: string;
+  CF_ACCESS_CLIENT_ID?: string;
+  CF_ACCESS_CLIENT_SECRET?: string;
   RESEND_API_KEY?: string;
   RESEND_AUDIENCE_ID?: string;
   RESEND_WEBHOOK_SECRET?: string;

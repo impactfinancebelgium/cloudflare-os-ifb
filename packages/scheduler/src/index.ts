@@ -27,7 +27,12 @@ async function runJob(job: Job, env: Env): Promise<void> {
       console.error(JSON.stringify({ job: job.id, outcome: "missing-secret", binding: bindingName }));
       return;
     }
-    headers[headerName] = secret.startsWith("Bearer ") ? secret : `Bearer ${secret}`;
+    // Only the Authorization header gets the Bearer scheme; custom headers
+    // (e.g. x-sync-key) carry the raw secret.
+    headers[headerName] =
+      headerName.toLowerCase() === "authorization" && !secret.startsWith("Bearer ")
+        ? `Bearer ${secret}`
+        : secret;
   }
 
   try {

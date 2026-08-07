@@ -34,7 +34,7 @@ export const ALLOWED_HOSTS = new Set([
   "new.impactfinance.be",
   "drive.impactfinance.be",
   "api.resend.com",
-  "bogiknzxejjhndthnzgg.supabase.co",
+  "ifb-os-edge.impact-finance-belgium.workers.dev",
 ]);
 
 export const JOBS: Job[] = [
@@ -52,19 +52,21 @@ export const JOBS: Job[] = [
     enabled: true,
     action: { type: "fetch", url: "https://crm.impactfinance.be/", okStatuses: [302] },
   },
-  // --- Staged, DISABLED until the Supabase migration cutover is approved -------------
-  // These replace the pg_cron + Edge Function pair currently doing the newsletter
-  // contact sync (repos/ifb-db). Enabling them is the cutover decision, Jonas's call.
+  // --- Staged, DISABLED until Jonas approves the cutover -----------------------------
+  // Replaces the Supabase pg_cron + Edge Function newsletter sync. The edge worker
+  // reads the cohort from Twenty CRM (the human source of truth) and pushes it to
+  // Resend; it also 503s until EDGE_ENABLED is flipped, so enabling this job is only
+  // half of the cutover.
   {
     id: "resend-contact-sync",
-    description: "STAGED: hourly newsletter contact sync (replaces Supabase pg_cron job).",
+    description: "STAGED: hourly Twenty -> Resend newsletter contact sync.",
     cron: "0 * * * *",
     enabled: false,
     action: {
       type: "fetch",
-      url: "https://bogiknzxejjhndthnzgg.supabase.co/functions/v1/sync-contacts-to-resend",
+      url: "https://ifb-os-edge.impact-finance-belgium.workers.dev/sync-contacts-to-resend",
       method: "POST",
-      secretHeader: ["Authorization", "SUPABASE_FUNCTION_TOKEN"],
+      secretHeader: ["x-sync-key", "SYNC_SECRET"],
     },
   },
 ];

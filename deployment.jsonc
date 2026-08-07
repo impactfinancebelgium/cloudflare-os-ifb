@@ -75,7 +75,8 @@
     "enabled": true,
     "cutover": false,
     "supabaseUrl": "https://bogiknzxejjhndthnzgg.supabase.co",
-    "resendAudienceId": "bb256ad9-171a-4293-a631-212a15668bc6"
+    "resendAudienceId": "bb256ad9-171a-4293-a631-212a15668bc6",
+    "twentyBaseUrl": "https://crm.impactfinance.be"
   },
 
   // IFB: read-only Twenty CRM gatekeeper (packages/twenty-gatekeeper). Secrets on the

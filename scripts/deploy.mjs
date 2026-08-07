@@ -373,6 +373,7 @@ export function generateConfigs(config, bases) {
       EDGE_ENABLED: config.edge.cutover === true ? "true" : "false",
       ...(config.edge.supabaseUrl ? { SUPABASE_URL: config.edge.supabaseUrl } : {}),
       ...(config.edge.resendAudienceId ? { RESEND_AUDIENCE_ID: config.edge.resendAudienceId } : {}),
+      ...(config.edge.twentyBaseUrl ? { TWENTY_BASE_URL: config.edge.twentyBaseUrl } : {}),
     };
   }
 

@@ -1,35 +1,58 @@
-// Port of supabase/functions/sync-contacts-to-resend (repos/ifb-db): push the
-// newsletter opt-in cohort from Supabase `contacts` into the Resend "General"
-// audience, then write resend_contact_id back. Idempotent; only opted-in contacts
-// are ever pushed (EU consent). Auth: x-sync-key header must equal SYNC_SECRET.
+// Twenty -> Resend newsletter sync (backlog item 6, replacing the original
+// Supabase-sourced port): the cohort is every Twenty person with
+// newsletterSubscribed = true and an email, pushed into the Resend "General"
+// audience. Only opted-in people are ever pushed (EU consent). Idempotent;
+// "already exists" (409/422) is a skip. After the push, `subscribed` (the
+// display-only "Resend state" field) is set true on cohort people found in the
+// audience. Auth to Twenty: the ifb-os-twenty Access service token + API key,
+// both Worker secrets. Auth to this route: x-sync-key must equal SYNC_SECRET.
 // `?dry_run=1` reports the plan without writing.
 
-import { json, sbHeaders, type Env } from "./env.js";
+import { json, type Env } from "./env.js";
 
-type Contact = {
-  email: string;
-  first_name: string | null;
-  last_name: string | null;
-  resend_contact_id: string | null;
+type TwentyPerson = {
+  id: string;
+  name?: { firstName?: string; lastName?: string };
+  emails?: { primaryEmail?: string };
+  subscribed?: boolean;
 };
+
+function twentyHeaders(env: Env): Record<string, string> {
+  return {
+    "CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID ?? "",
+    "CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET ?? "",
+    authorization: `Bearer ${env.TWENTY_API_KEY ?? ""}`,
+    "content-type": "application/json",
+    "user-agent": "ifb-os-edge",
+  };
+}
 
 const reHeaders = (env: Env) => ({
   authorization: `Bearer ${env.RESEND_API_KEY}`,
   "content-type": "application/json",
 });
 
-async function fetchCohort(env: Env): Promise<Contact[]> {
-  const out: Contact[] = [];
-  const page = 1000;
-  for (let from = 0; ; from += page) {
+// Twenty caps page size at 60; paginate with pageInfo.endCursor (record-id
+// pagination silently caps out, the known gotcha from the migration).
+async function fetchCohort(env: Env): Promise<TwentyPerson[]> {
+  const out: TwentyPerson[] = [];
+  const filter = encodeURIComponent("newsletterSubscribed[eq]:true");
+  let cursor = "";
+  for (;;) {
+    const after = cursor ? `&starting_after=${encodeURIComponent(cursor)}` : "";
     const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/contacts?select=email,first_name,last_name,resend_contact_id&newsletter_subscribed=is.true&email=not.is.null`,
-      { headers: { ...sbHeaders(env), Range: `${from}-${from + page - 1}`, "Range-Unit": "items" } },
+      `${env.TWENTY_BASE_URL}/rest/people?limit=60&filter=${filter}${after}`,
+      { headers: twentyHeaders(env), signal: AbortSignal.timeout(30_000) },
     );
-    const rows = (await res.json()) as Contact[];
-    if (!Array.isArray(rows) || rows.length === 0) break;
-    out.push(...rows);
-    if (rows.length < page) break;
+    if (!res.ok) throw new Error(`Twenty cohort fetch failed (${res.status})`);
+    const body = (await res.json()) as {
+      data?: { people?: TwentyPerson[] };
+      pageInfo?: { hasNextPage?: boolean; endCursor?: string };
+    };
+    const rows = body.data?.people ?? [];
+    out.push(...rows.filter((p) => p.emails?.primaryEmail));
+    if (!body.pageInfo?.hasNextPage || !body.pageInfo.endCursor) break;
+    cursor = body.pageInfo.endCursor;
   }
   return out;
 }
@@ -55,17 +78,20 @@ export async function syncContacts(req: Request, env: Env): Promise<Response> {
   const dryRun = new URL(req.url).searchParams.get("dry_run") === "1";
 
   const cohort = await fetchCohort(env);
-  const cohortByEmail = new Map(cohort.map((c) => [c.email.toLowerCase(), c]));
+  const cohortByEmail = new Map(
+    cohort.map((p) => [p.emails!.primaryEmail!.toLowerCase(), p]),
+  );
   const existing = await audienceEmails(env);
   const toCreate = [...cohortByEmail.entries()].filter(([em]) => !existing.has(em));
 
   let created = 0;
+  let marked = 0;
   const failures: Array<{ email: string; code: number }> = [];
   if (!dryRun) {
-    for (const [em, c] of toCreate) {
+    for (const [em, p] of toCreate) {
       const body: Record<string, unknown> = { email: em, unsubscribed: false };
-      if (c.first_name) body.first_name = c.first_name;
-      if (c.last_name) body.last_name = c.last_name;
+      if (p.name?.firstName) body.first_name = p.name.firstName;
+      if (p.name?.lastName) body.last_name = p.name.lastName;
       const r = await fetch(`https://api.resend.com/audiences/${env.RESEND_AUDIENCE_ID}/contacts`, {
         method: "POST",
         headers: reHeaders(env),
@@ -75,24 +101,27 @@ export async function syncContacts(req: Request, env: Env): Promise<Response> {
       else if (r.status !== 409 && r.status !== 422) failures.push({ email: em, code: r.status });
     }
 
-    // Crash-safe write-back: map resend_contact_id for every cohort email now in the audience.
+    // Crash-safe write-back: mark `subscribed` on cohort people now in the audience.
     const after = await audienceEmails(env);
-    for (const [em, cid] of after) {
-      if (!cohortByEmail.has(em)) continue;
-      await fetch(`${env.SUPABASE_URL}/rest/v1/contacts?email=eq.${encodeURIComponent(em)}`, {
+    for (const [em, p] of cohortByEmail) {
+      if (!after.has(em) || p.subscribed === true) continue;
+      const r = await fetch(`${env.TWENTY_BASE_URL}/rest/people/${encodeURIComponent(p.id)}`, {
         method: "PATCH",
-        headers: { ...sbHeaders(env), Prefer: "return=minimal" },
-        body: JSON.stringify({ resend_contact_id: cid, subscribed: true }),
+        headers: twentyHeaders(env),
+        body: JSON.stringify({ subscribed: true }),
       });
+      if (r.ok) marked++;
     }
   }
 
   return json({
+    source: "twenty",
     dryRun,
     cohort: cohortByEmail.size,
     audience: existing.size,
     toCreate: toCreate.length,
     created,
+    markedSubscribed: marked,
     failures: failures.length,
     sampleFailures: failures.slice(0, 5),
   });

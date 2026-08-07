@@ -1,19 +1,39 @@
-// Port of supabase/functions/resend-webhook (repos/ifb-db): reverse sync
-// Resend -> Supabase. Unsubscribes/complaints/deletions in Resend flip
-// newsletter_subscribed off in `contacts` so the push sync never re-adds them.
+// Reverse sync, Resend -> Twenty CRM (backlog item 6): when someone unsubscribes,
+// complains, or is deleted in Resend, flip newsletterSubscribed/subscribed off on
+// the matching Twenty person so the push sync never re-adds them.
 // Auth: Svix signature (see svix.ts) against RESEND_WEBHOOK_SECRET.
 
-import { json, sbHeaders, type Env } from "./env.js";
+import { json, type Env } from "./env.js";
 import { verifySvix } from "./svix.js";
+
+function twentyHeaders(env: Env): Record<string, string> {
+  return {
+    "CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID ?? "",
+    "CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET ?? "",
+    authorization: `Bearer ${env.TWENTY_API_KEY ?? ""}`,
+    "content-type": "application/json",
+    "user-agent": "ifb-os-edge",
+  };
+}
 
 async function unsubscribe(env: Env, email?: string): Promise<void> {
   const em = (email ?? "").toLowerCase().trim();
   if (!em) return;
-  await fetch(`${env.SUPABASE_URL}/rest/v1/contacts?email=eq.${encodeURIComponent(em)}`, {
-    method: "PATCH",
-    headers: { ...sbHeaders(env), Prefer: "return=minimal" },
-    body: JSON.stringify({ newsletter_subscribed: false, subscribed: false }),
+  // ilike without wildcards = case-insensitive exact match (person emails are unique).
+  const filter = encodeURIComponent(`emails.primaryEmail[ilike]:${em.replace(/[%(),:]/g, "")}`);
+  const res = await fetch(`${env.TWENTY_BASE_URL}/rest/people?limit=2&filter=${filter}`, {
+    headers: twentyHeaders(env),
+    signal: AbortSignal.timeout(20_000),
   });
+  if (!res.ok) throw new Error(`Twenty lookup failed (${res.status})`);
+  const body = (await res.json()) as { data?: { people?: Array<{ id: string }> } };
+  for (const person of body.data?.people ?? []) {
+    await fetch(`${env.TWENTY_BASE_URL}/rest/people/${encodeURIComponent(person.id)}`, {
+      method: "PATCH",
+      headers: twentyHeaders(env),
+      body: JSON.stringify({ newsletterSubscribed: false, subscribed: false }),
+    });
+  }
 }
 
 export async function resendWebhook(req: Request, env: Env): Promise<Response> {
