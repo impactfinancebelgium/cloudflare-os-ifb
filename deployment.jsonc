@@ -34,10 +34,10 @@
   // When enabled, replace every placeholder and install CF_AI_GATEWAY_API_TOKEN separately.
   // Reference: docs/customization.md#ai-models
   "aiGateway": {
-    "enabled": false,
+    "enabled": true,
     "name": "ifb-os",
     "accountId": "4fd93a4887e7982e732c9df8ed51ea21",
-    "providers": ["anthropic", "openai", "google", "cloudflare"],
+    "providers": ["cloudflare"],
 
     // "direct" sends Workers AI to its REST endpoint. "gateway" adds AI Gateway logs.
     "workersAi": { "mode": "gateway", "gateway": "ifb-os" }
