@@ -21,7 +21,8 @@ import * as db from "./db";
 export * from "./gatekeeper";
 import { mintToken, sha256Hex, verifyToken } from "./token";
 import { handleMcp } from "./mcp";
-import { agentPage, formPage } from "./ui";
+import { formPage } from "./form-page";
+import { agentPage } from "./ui";
 
 export interface Env {
   DB: D1Database;
@@ -181,7 +182,7 @@ export default {
         db.roundMeta(env.DB, auth.roundId), db.orgName(env.DB, auth.orgId),
       ]);
       return new Response(
-        formPage(org ?? auth.orgId, (meta as { label?: string })?.label ?? "Market survey"),
+        formPage(org ?? auth.orgId, (meta as { label?: string })?.label ?? "Market survey", auth.roundId),
         { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
     }
 
