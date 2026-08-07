@@ -5,6 +5,9 @@
 
 import { ALLOWED_HOSTS, JOBS, type Job } from "./jobs.js";
 
+// Gatekeeper entrypoints: the read-only "Scheduled jobs (IFB)" vendor card in the OS.
+export * from "./gatekeeper.js";
+
 type Env = Record<string, string | undefined>;
 
 const FETCH_TIMEOUT_MS = 30_000;

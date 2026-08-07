@@ -325,6 +325,11 @@ export function generateConfigs(config, bases) {
       service: config.workers.twentyGatekeeper.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
+    ...(config.scheduler?.enabled ? [{
+      binding: "GATEKEEPER_SCHEDULER",
+      service: config.workers.scheduler.name,
+      entrypoint: "GatekeeperVendor",
+    }] : []),
   ];
   workshop.kv_namespaces = [
     { binding: "BLUEPRINTS", ...(config.resources.blueprintsKvNamespaceId
@@ -473,12 +478,13 @@ async function main() {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/twenty-gatekeeper"));
     }
-    run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
-      join(root, "cloudflare-os/packages/workshop-backend"));
     if (config.scheduler?.enabled) {
+      // Also before the workshop: it binds GATEKEEPER_SCHEDULER to this service.
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/scheduler"));
     }
+    run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+      join(root, "cloudflare-os/packages/workshop-backend"));
     if (config.edge?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/edge"));
