@@ -16,7 +16,8 @@
     },
     "context": { "name": "ifb-os-context" },
     "customGatekeeper": { "name": "ifb-os-gatekeeper" },
-    "errorReporter": { "name": "ifb-os-errors" }
+    "errorReporter": { "name": "ifb-os-errors" },
+    "scheduler": { "name": "ifb-os-scheduler" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -62,6 +63,9 @@
   // Explicit backend issue reports go to a private Worker that emits structured console errors.
   // Set release to a commit/version when your deployment pipeline has one.
   // Reference: docs/observability.md#quick-start
+  // IFB: git-defined scheduled jobs (packages/scheduler). See jobs.ts for the table.
+  "scheduler": { "enabled": true },
+
   "errorReporting": {
     "enabled": true,
     "environment": "production",

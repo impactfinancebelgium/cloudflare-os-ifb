@@ -13,6 +13,7 @@ const generatedPaths = {
   context: join(root, "cloudflare-os/packages/gatekeeper-context", generatedName),
   customGatekeeper: join(root, "packages/custom-gatekeeper", generatedName),
   errorReporter: join(root, "packages/error-reporter", generatedName),
+  scheduler: join(root, "packages/scheduler", generatedName),  // IFB: job scheduling
 };
 
 const requiredPaths = [
@@ -47,6 +48,11 @@ const errorReportingPaths = [
   "errorReporting.environment",
 ];
 
+// IFB: the scheduler worker is optional, mirroring errorReporter.
+const schedulerPaths = [
+  "workers.scheduler.name",
+];
+
 const resourcePaths = [
   "context.kvNamespaceId",
   "resources.blueprintsKvNamespaceId",
@@ -63,6 +69,7 @@ export function validateConfig(config) {
     ...requiredPaths,
     ...(config.aiGateway?.enabled ? aiGatewayPaths : []),
     ...(config.errorReporting?.enabled ? errorReportingPaths : []),
+    ...(config.scheduler?.enabled ? schedulerPaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -119,6 +126,7 @@ export function validateConfig(config) {
   }
   const workerNames = Object.entries(config.workers)
     .filter(([key]) => key !== "errorReporter" || config.errorReporting.enabled)
+    .filter(([key]) => key !== "scheduler" || config.scheduler?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -238,6 +246,9 @@ export function generateConfigs(config, bases) {
   const errorReporter = config.errorReporting.enabled
     ? structuredClone(bases.errorReporter)
     : undefined;
+  const scheduler = config.scheduler?.enabled
+    ? structuredClone(bases.scheduler)
+    : undefined;
 
   setCommon(workshop, config, config.workers.workshop.name, config.workers.workshop.route);
   workshop.vars = {
@@ -319,8 +330,12 @@ export function generateConfigs(config, bases) {
   if (errorReporter) {
     setCommon(errorReporter, config, config.workers.errorReporter.name);
   }
+  if (scheduler) {
+    setCommon(scheduler, config, config.workers.scheduler.name);
+  }
 
-  return { workshop, context, customGatekeeper, ...(errorReporter && { errorReporter }) };
+  return { workshop, context, customGatekeeper,
+    ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }) };
 }
 
 async function readJsonc(path) {
@@ -364,6 +379,9 @@ function build(config) {
   if (config.errorReporting.enabled) {
     run(["--dir", "packages/error-reporter", "run", "build"]);
   }
+  if (config.scheduler?.enabled) {
+    run(["--dir", "packages/scheduler", "run", "build"]);
+  }
   run(["--dir", "cloudflare-os", "--filter", "@gadgets/workshop-frontend", "build"], root, {
     ...process.env,
     VITE_CF_ACCESS_MODE: "true",
@@ -379,6 +397,7 @@ async function main() {
     context: await readJsonc(join(root, "cloudflare-os/packages/gatekeeper-context/wrangler.jsonc")),
     customGatekeeper: await readJsonc(join(root, "packages/custom-gatekeeper/wrangler.jsonc")),
     errorReporter: await readJsonc(join(root, "packages/error-reporter/wrangler.jsonc")),
+    scheduler: await readJsonc(join(root, "packages/scheduler/wrangler.jsonc")),
   });
 
   try {
@@ -399,6 +418,10 @@ async function main() {
       join(root, "packages/custom-gatekeeper"));
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));
+    if (config.scheduler?.enabled) {
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/scheduler"));
+    }
   } finally {
     await Promise.all(Object.values(generatedPaths).map((path) => rm(path, { force: true })));
   }
