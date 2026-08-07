@@ -447,8 +447,11 @@ export function generateConfigs(config, bases) {
   }
 
   if (survey) {
-    // Member-facing on workers.dev for the MVP; a custom hostname is a deliberate later step.
+    // workers.dev stays on (existing invite links), plus the member-facing custom domain.
     setCommon(survey, config, config.workers.survey.name, { workersDev: true });
+    if (config.survey.customDomain) {
+      survey.routes = [{ pattern: config.survey.customDomain, custom_domain: true }];
+    }
   }
 
   return { workshop, context, customGatekeeper,

@@ -99,7 +99,11 @@
 
   // IFB: member survey app (packages/survey). Worker + D1 `ifb-survey` (region WEUR).
   // Member auth is signed invite tokens, never Cloudflare Access (per-seat cost).
-  "survey": { "enabled": true },
+  "survey": {
+    "enabled": true,
+    // Member-facing hostname; workers.dev stays active so existing links keep working.
+    "customDomain": "survey.impactfinance.be"
+  },
 
   "errorReporting": {
     "enabled": true,
