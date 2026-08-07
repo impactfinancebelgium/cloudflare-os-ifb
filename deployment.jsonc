@@ -18,7 +18,8 @@
     "customGatekeeper": { "name": "ifb-os-gatekeeper" },
     "errorReporter": { "name": "ifb-os-errors" },
     "scheduler": { "name": "ifb-os-scheduler" },
-    "edge": { "name": "ifb-os-edge" }
+    "edge": { "name": "ifb-os-edge" },
+    "twentyGatekeeper": { "name": "ifb-os-twenty-gatekeeper" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -76,6 +77,11 @@
     "supabaseUrl": "https://bogiknzxejjhndthnzgg.supabase.co",
     "resendAudienceId": "bb256ad9-171a-4293-a631-212a15668bc6"
   },
+
+  // IFB: read-only Twenty CRM gatekeeper (packages/twenty-gatekeeper). Secrets on the
+  // ifb-os-twenty-gatekeeper worker: TWENTY_API_KEY + the ifb-os-twenty Access service
+  // token pair (all in the IFB 1Password vault).
+  "twentyGatekeeper": { "enabled": true },
 
   "errorReporting": {
     "enabled": true,

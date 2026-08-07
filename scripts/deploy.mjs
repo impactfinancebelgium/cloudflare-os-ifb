@@ -15,6 +15,7 @@ const generatedPaths = {
   errorReporter: join(root, "packages/error-reporter", generatedName),
   scheduler: join(root, "packages/scheduler", generatedName),  // IFB: job scheduling
   edge: join(root, "packages/edge", generatedName),  // IFB: staged Supabase-exit worker
+  twentyGatekeeper: join(root, "packages/twenty-gatekeeper", generatedName),  // IFB: CRM read-only
 };
 
 const requiredPaths = [
@@ -59,6 +60,11 @@ const edgePaths = [
   "workers.edge.name",
 ];
 
+// IFB: the Twenty CRM read-only gatekeeper is optional too.
+const twentyGatekeeperPaths = [
+  "workers.twentyGatekeeper.name",
+];
+
 const resourcePaths = [
   "context.kvNamespaceId",
   "resources.blueprintsKvNamespaceId",
@@ -77,6 +83,7 @@ export function validateConfig(config) {
     ...(config.errorReporting?.enabled ? errorReportingPaths : []),
     ...(config.scheduler?.enabled ? schedulerPaths : []),
     ...(config.edge?.enabled ? edgePaths : []),
+    ...(config.twentyGatekeeper?.enabled ? twentyGatekeeperPaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -135,6 +142,7 @@ export function validateConfig(config) {
     .filter(([key]) => key !== "errorReporter" || config.errorReporting.enabled)
     .filter(([key]) => key !== "scheduler" || config.scheduler?.enabled)
     .filter(([key]) => key !== "edge" || config.edge?.enabled)
+    .filter(([key]) => key !== "twentyGatekeeper" || config.twentyGatekeeper?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -260,6 +268,9 @@ export function generateConfigs(config, bases) {
   const edge = config.edge?.enabled
     ? structuredClone(bases.edge)
     : undefined;
+  const twentyGatekeeper = config.twentyGatekeeper?.enabled
+    ? structuredClone(bases.twentyGatekeeper)
+    : undefined;
 
   setCommon(workshop, config, config.workers.workshop.name, config.workers.workshop.route);
   workshop.vars = {
@@ -309,6 +320,11 @@ export function generateConfigs(config, bases) {
       service: config.workers.customGatekeeper.name,
       entrypoint: "GatekeeperVendor",
     },
+    ...(config.twentyGatekeeper?.enabled ? [{
+      binding: "GATEKEEPER_TWENTY",
+      service: config.workers.twentyGatekeeper.name,
+      entrypoint: "GatekeeperVendor",
+    }] : []),
   ];
   workshop.kv_namespaces = [
     { binding: "BLUEPRINTS", ...(config.resources.blueprintsKvNamespaceId
@@ -344,6 +360,9 @@ export function generateConfigs(config, bases) {
   if (scheduler) {
     setCommon(scheduler, config, config.workers.scheduler.name);
   }
+  if (twentyGatekeeper) {
+    setCommon(twentyGatekeeper, config, config.workers.twentyGatekeeper.name);
+  }
   if (edge) {
     // workers.dev route so the staged worker is reachable for verification; a live
     // hostname only arrives at cutover.
@@ -359,7 +378,7 @@ export function generateConfigs(config, bases) {
 
   return { workshop, context, customGatekeeper,
     ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }),
-    ...(edge && { edge }) };
+    ...(edge && { edge }), ...(twentyGatekeeper && { twentyGatekeeper }) };
 }
 
 async function readJsonc(path) {
@@ -409,6 +428,9 @@ function build(config) {
   if (config.edge?.enabled) {
     run(["--dir", "packages/edge", "run", "build"]);
   }
+  if (config.twentyGatekeeper?.enabled) {
+    run(["--dir", "packages/twenty-gatekeeper", "run", "build"]);
+  }
   run(["--dir", "cloudflare-os", "--filter", "@gadgets/workshop-frontend", "build"], root, {
     ...process.env,
     VITE_CF_ACCESS_MODE: "true",
@@ -426,6 +448,7 @@ async function main() {
     errorReporter: await readJsonc(join(root, "packages/error-reporter/wrangler.jsonc")),
     scheduler: await readJsonc(join(root, "packages/scheduler/wrangler.jsonc")),
     edge: await readJsonc(join(root, "packages/edge/wrangler.jsonc")),
+    twentyGatekeeper: await readJsonc(join(root, "packages/twenty-gatekeeper/wrangler.jsonc")),
   });
 
   try {
@@ -444,6 +467,11 @@ async function main() {
       join(root, "cloudflare-os/packages/gatekeeper-context"));
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "packages/custom-gatekeeper"));
+    if (config.twentyGatekeeper?.enabled) {
+      // Before the workshop: it binds GATEKEEPER_TWENTY to this service.
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/twenty-gatekeeper"));
+    }
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));
     if (config.scheduler?.enabled) {

@@ -1,0 +1,28 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "twenty-gatekeeper",
+  "main": ".wrangler/validate/src/index.ts",
+  "build": {
+    "command": "pnpm exec capnweb-validate build --out .wrangler/validate",
+    "watch_dir": "src"
+  },
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["allow_irrevocable_stub_storage", "nodejs_compat"],
+  "migrations": [
+    {
+      "tag": "v0",
+      "new_sqlite_classes": ["TwentyGatekeeper"]
+    }
+  ],
+  "vars": {
+    "TWENTY_BASE_URL": "https://crm.impactfinance.be"
+  },
+  // Secrets installed once with `wrangler secret put --name ifb-os-twenty-gatekeeper`:
+  // TWENTY_API_KEY, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET (the ifb-os-twenty
+  // Access service token; values live in the IFB 1Password vault).
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": false }
+  }
+}
