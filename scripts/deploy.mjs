@@ -14,6 +14,7 @@ const generatedPaths = {
   customGatekeeper: join(root, "packages/custom-gatekeeper", generatedName),
   errorReporter: join(root, "packages/error-reporter", generatedName),
   scheduler: join(root, "packages/scheduler", generatedName),  // IFB: job scheduling
+  edge: join(root, "packages/edge", generatedName),  // IFB: staged Supabase-exit worker
 };
 
 const requiredPaths = [
@@ -53,6 +54,11 @@ const schedulerPaths = [
   "workers.scheduler.name",
 ];
 
+// IFB: the edge worker (ported Supabase Edge Functions) is optional too.
+const edgePaths = [
+  "workers.edge.name",
+];
+
 const resourcePaths = [
   "context.kvNamespaceId",
   "resources.blueprintsKvNamespaceId",
@@ -70,6 +76,7 @@ export function validateConfig(config) {
     ...(config.aiGateway?.enabled ? aiGatewayPaths : []),
     ...(config.errorReporting?.enabled ? errorReportingPaths : []),
     ...(config.scheduler?.enabled ? schedulerPaths : []),
+    ...(config.edge?.enabled ? edgePaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -127,6 +134,7 @@ export function validateConfig(config) {
   const workerNames = Object.entries(config.workers)
     .filter(([key]) => key !== "errorReporter" || config.errorReporting.enabled)
     .filter(([key]) => key !== "scheduler" || config.scheduler?.enabled)
+    .filter(([key]) => key !== "edge" || config.edge?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -249,6 +257,9 @@ export function generateConfigs(config, bases) {
   const scheduler = config.scheduler?.enabled
     ? structuredClone(bases.scheduler)
     : undefined;
+  const edge = config.edge?.enabled
+    ? structuredClone(bases.edge)
+    : undefined;
 
   setCommon(workshop, config, config.workers.workshop.name, config.workers.workshop.route);
   workshop.vars = {
@@ -333,9 +344,22 @@ export function generateConfigs(config, bases) {
   if (scheduler) {
     setCommon(scheduler, config, config.workers.scheduler.name);
   }
+  if (edge) {
+    // workers.dev route so the staged worker is reachable for verification; a live
+    // hostname only arrives at cutover.
+    setCommon(edge, config, config.workers.edge.name, { workersDev: true });
+    // The cutover gate ships as a var so a deploy can never silently enable the
+    // routes: flipping it means editing deployment.jsonc (a reviewed change).
+    edge.vars = {
+      EDGE_ENABLED: config.edge.cutover === true ? "true" : "false",
+      ...(config.edge.supabaseUrl ? { SUPABASE_URL: config.edge.supabaseUrl } : {}),
+      ...(config.edge.resendAudienceId ? { RESEND_AUDIENCE_ID: config.edge.resendAudienceId } : {}),
+    };
+  }
 
   return { workshop, context, customGatekeeper,
-    ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }) };
+    ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }),
+    ...(edge && { edge }) };
 }
 
 async function readJsonc(path) {
@@ -382,6 +406,9 @@ function build(config) {
   if (config.scheduler?.enabled) {
     run(["--dir", "packages/scheduler", "run", "build"]);
   }
+  if (config.edge?.enabled) {
+    run(["--dir", "packages/edge", "run", "build"]);
+  }
   run(["--dir", "cloudflare-os", "--filter", "@gadgets/workshop-frontend", "build"], root, {
     ...process.env,
     VITE_CF_ACCESS_MODE: "true",
@@ -398,6 +425,7 @@ async function main() {
     customGatekeeper: await readJsonc(join(root, "packages/custom-gatekeeper/wrangler.jsonc")),
     errorReporter: await readJsonc(join(root, "packages/error-reporter/wrangler.jsonc")),
     scheduler: await readJsonc(join(root, "packages/scheduler/wrangler.jsonc")),
+    edge: await readJsonc(join(root, "packages/edge/wrangler.jsonc")),
   });
 
   try {
@@ -421,6 +449,10 @@ async function main() {
     if (config.scheduler?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/scheduler"));
+    }
+    if (config.edge?.enabled) {
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/edge"));
     }
   } finally {
     await Promise.all(Object.values(generatedPaths).map((path) => rm(path, { force: true })));

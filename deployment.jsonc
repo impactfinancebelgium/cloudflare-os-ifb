@@ -17,7 +17,8 @@
     "context": { "name": "ifb-os-context" },
     "customGatekeeper": { "name": "ifb-os-gatekeeper" },
     "errorReporter": { "name": "ifb-os-errors" },
-    "scheduler": { "name": "ifb-os-scheduler" }
+    "scheduler": { "name": "ifb-os-scheduler" },
+    "edge": { "name": "ifb-os-edge" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -65,6 +66,16 @@
   // Reference: docs/observability.md#quick-start
   // IFB: git-defined scheduled jobs (packages/scheduler). See jobs.ts for the table.
   "scheduler": { "enabled": true },
+
+  // IFB: the three Supabase Edge Functions ported to a Worker (packages/edge), STAGED
+  // for the Supabase exit. cutover:false keeps every route answering 503; flipping it
+  // to true (plus repointing the website + Resend webhook) is the cutover decision.
+  "edge": {
+    "enabled": true,
+    "cutover": false,
+    "supabaseUrl": "https://bogiknzxejjhndthnzgg.supabase.co",
+    "resendAudienceId": "bb256ad9-171a-4293-a631-212a15668bc6"
+  },
 
   "errorReporting": {
     "enabled": true,

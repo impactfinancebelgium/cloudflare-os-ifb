@@ -1,0 +1,14 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "edge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-04",
+  // Reachable on workers.dev for staged verification; no custom domain until cutover
+  // (pointing a live hostname here is the cutover decision, not a deploy side effect).
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": { "invocation_logs": false }
+  }
+}
