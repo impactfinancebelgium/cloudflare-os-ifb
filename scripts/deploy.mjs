@@ -372,6 +372,11 @@ export function generateConfigs(config, bases) {
       service: config.workers.sharepointGatekeeper.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
+    ...(config.survey?.enabled ? [{
+      binding: "GATEKEEPER_SURVEY",
+      service: config.workers.survey.name,
+      entrypoint: "GatekeeperVendor",
+    }] : []),
   ];
   workshop.kv_namespaces = [
     { binding: "BLUEPRINTS", ...(config.resources.blueprintsKvNamespaceId
@@ -567,15 +572,16 @@ async function main() {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/sharepoint-gatekeeper"));
     }
+    if (config.survey?.enabled) {
+      // Before the workshop: it binds GATEKEEPER_SURVEY to this service.
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/survey"));
+    }
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));
     if (config.edge?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/edge"));
-    }
-    if (config.survey?.enabled) {
-      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
-        join(root, "packages/survey"));
     }
   } finally {
     await Promise.all(Object.values(generatedPaths).map((path) => rm(path, { force: true })));

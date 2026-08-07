@@ -17,8 +17,11 @@
  */
 
 import * as db from "./db";
+
+export * from "./gatekeeper";
 import { mintToken, sha256Hex, verifyToken } from "./token";
-import { formPage } from "./ui";
+import { handleMcp } from "./mcp";
+import { agentPage, formPage } from "./ui";
 
 export interface Env {
   DB: D1Database;
@@ -91,6 +94,23 @@ export default {
       return json({ ok: true, link: `${base}/r/${body.round_id}?t=${token}` });
     }
 
+    // ---- MCP: the member-agent handoff (same token authority as the form) ---
+    if (path === "/mcp") {
+      if (request.method === "DELETE") return new Response(null, { status: 202 });
+      if (request.method !== "POST") {
+        return json({ hint: "MCP endpoint. POST JSON-RPC here; connect with: claude mcp add --transport http ifb-survey \"<this url including ?t=...>\"" }, 405);
+      }
+      const auth = await authenticate(request, env);
+      if (!auth) return json({ error: "invalid_or_expired_token" }, 401);
+      return handleMcp(request, env.DB, auth);
+    }
+
+    // Plain-language brief for agents; carries no survey data, so it is public.
+    if (path === "/api/agent-guide") {
+      return new Response(AGENT_GUIDE, {
+        headers: { "content-type": "text/markdown; charset=utf-8" } });
+    }
+
     // ---- member/agent API ---------------------------------------------------
     if (path.startsWith("/api/")) {
       const auth = await authenticate(request, env);
@@ -137,6 +157,19 @@ export default {
       return json({ error: "not_found" }, 404);
     }
 
+    // ---- agent handoff page -------------------------------------------------
+    if (path.startsWith("/r/") && path.endsWith("/agent")) {
+      const auth = await authenticate(request, env);
+      if (!auth) {
+        return new Response("This invite link is invalid or has expired. Contact IFB for a fresh link.",
+          { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
+      }
+      const token = url.searchParams.get("t") ?? "";
+      const org = await db.orgName(env.DB, auth.orgId);
+      return new Response(agentPage(url.origin, auth.roundId, token, org ?? auth.orgId),
+        { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+
     // ---- human form ---------------------------------------------------------
     if (path.startsWith("/r/")) {
       const auth = await authenticate(request, env);
@@ -160,3 +193,29 @@ export default {
     return json({ error: "not_found" }, 404);
   },
 } satisfies ExportedHandler<Env>;
+
+const AGENT_GUIDE = `# IFB market survey: guide for agents
+
+You are acting for ONE invited organisation. The invite token (Bearer token, or ?t= on
+/mcp) scopes everything to that organisation and round; you cannot see or touch anyone
+else's data.
+
+## Endpoints
+- MCP: POST /mcp?t=<token>  (tools: get_schema, get_draft, update_answers, submit_response)
+- REST: GET /api/schema, GET /api/draft, PATCH /api/draft {"answers":{"<code>":<value>}},
+  POST /api/submit {"by":"agent:<name>"} with Authorization: Bearer <token>.
+
+## Semantics that matter
+- Answers with source "prefilled" were carried over from the organisation's PREVIOUS
+  submission (the survey runs every two years). Treat them as a starting point: confirm
+  them against current figures or update them. Do not invent numbers; ask the member.
+- Question codes come from the schema. Values: string (text/select), number (number),
+  array of strings (multiselect). display_if rules say when a question applies.
+- Saving is incremental; you can update answers across many calls or sessions.
+- Submission is FINAL and locks the draft. Only submit after the member has explicitly
+  approved; attribute yourself in submitted_by.
+
+## Confidentiality
+Per-organisation answers are confidential to IFB; only aggregates are ever published.
+Do not paste the organisation's answers into public channels.
+`;

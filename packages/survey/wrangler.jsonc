@@ -1,9 +1,19 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "survey",
-  "main": "src/index.ts",
+  "main": ".wrangler/validate/src/index.ts",
+  "build": {
+    "command": "pnpm exec capnweb-validate build --out .wrangler/validate",
+    "watch_dir": "src"
+  },
   "compatibility_date": "2026-08-04",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["allow_irrevocable_stub_storage", "nodejs_compat"],
+  "migrations": [
+    {
+      "tag": "v0",
+      "new_sqlite_classes": ["SurveyGatekeeper"]
+    }
+  ],
   // Reachable on workers.dev; survey.impactfinance.be is a later, deliberate step.
   "workers_dev": true,
   "preview_urls": false,
