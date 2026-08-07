@@ -396,9 +396,14 @@ export function generateConfigs(config, bases) {
     { binding: "CONTEXT_COLLECTIONS", ...(config.context.kvNamespaceId
       ? { id: config.context.kvNamespaceId } : {}) },
   ];
-  context.artifacts = [
-    { binding: "ARTIFACTS", namespace: config.context.artifactsNamespace ?? "ifb-os-context" },
-  ];
+  // Artifacts (git-backed collections) is account-gated (API error 10015 without it);
+  // enable via config once Cloudflare unlocks it. Web-source collections + the
+  // admin API's document push work without it.
+  if (config.context.artifactsEnabled) {
+    context.artifacts = [
+      { binding: "ARTIFACTS", namespace: config.context.artifactsNamespace ?? "ifb-os-context" },
+    ];
+  }
   context.vars = { SHARING_DOMAIN: config.context.sharingDomain };
 
   setCommon(customGatekeeper, config, config.workers.customGatekeeper.name);
