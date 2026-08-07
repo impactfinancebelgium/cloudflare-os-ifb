@@ -160,10 +160,10 @@ export function validateConfig(config) {
     throw new Error("AI Gateway enabled must be a boolean.");
   }
   if (config.aiGateway.enabled) {
-    const providers = new Set(["anthropic", "openai", "google", "cloudflare"]);
+    const providers = new Set(["anthropic", "openai", "google", "cloudflare", "openrouter"]);  // IFB: openrouter added
     if (!Array.isArray(config.aiGateway.providers) ||
         !config.aiGateway.providers.every((provider) => providers.has(provider))) {
-      throw new Error("AI Gateway providers must be anthropic, openai, google, or cloudflare.");
+      throw new Error("AI Gateway providers must be anthropic, openai, google, cloudflare, or openrouter.");
     }
     const workersAi = config.aiGateway.workersAi;
     if (!(["direct", "gateway"].includes(workersAi.mode))) {
