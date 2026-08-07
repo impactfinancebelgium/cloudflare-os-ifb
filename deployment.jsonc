@@ -1,22 +1,22 @@
 {
   // Cloudflare account that owns every Worker and provisioned resource.
   // Find it: https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/
-  "accountId": "<CLOUDFLARE_ACCOUNT_ID>",
+  "accountId": "4fd93a4887e7982e732c9df8ed51ea21",
 
   // Worker names are permanent service identities. Keep them unique within the account.
   // Reference: docs/customization.md#workers-and-routing
   "workers": {
     "workshop": {
-      "name": "<WORKSHOP_WORKER_NAME>",
+      "name": "ifb-os",
 
       // Production: use a hostname in an active Cloudflare zone. Wrangler creates DNS and TLS.
       // Evaluation: replace this with "route": { "workersDev": true }.
       // https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
-      "route": { "customDomain": "os.example.com" }
+      "route": { "customDomain": "os.impactfinance.be" }
     },
-    "context": { "name": "<CONTEXT_WORKER_NAME>" },
-    "customGatekeeper": { "name": "<CUSTOM_GATEKEEPER_WORKER_NAME>" },
-    "errorReporter": { "name": "<ERROR_REPORTER_WORKER_NAME>" }
+    "context": { "name": "ifb-os-context" },
+    "customGatekeeper": { "name": "ifb-os-gatekeeper" },
+    "errorReporter": { "name": "ifb-os-errors" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -25,9 +25,9 @@
   // "admins" gates /admin in every sign-in method.
   // Reference: docs/customization.md#sign-in-methods
   "access": {
-    "issuer": "https://<TEAM_NAME>.cloudflareaccess.com",
-    "audience": "<ACCESS_AUDIENCE>",
-    "admins": ["<ADMIN_EMAIL>"]
+    "issuer": "https://aged-cherry-4437.cloudflareaccess.com",
+    "audience": "4c17b3fe12257f08722b9acba9723e3cae8266bf7839bfee3e8909069d68e33a",
+    "admins": ["jonas@sparkcollective.be", "lynn@impactfinance.be"]
   },
 
   // Optional platform-funded model catalog. Leave disabled to deploy without AI setup.
@@ -35,12 +35,12 @@
   // Reference: docs/customization.md#ai-models
   "aiGateway": {
     "enabled": false,
-    "name": "<AI_GATEWAY_NAME>",
-    "accountId": "<AI_GATEWAY_ACCOUNT_ID>",
+    "name": "ifb-os",
+    "accountId": "4fd93a4887e7982e732c9df8ed51ea21",
     "providers": ["anthropic", "openai", "google", "cloudflare"],
 
     // "direct" sends Workers AI to its REST endpoint. "gateway" adds AI Gateway logs.
-    "workersAi": { "mode": "gateway", "gateway": "<WORKERS_AI_GATEWAY_NAME>" }
+    "workersAi": { "mode": "gateway", "gateway": "ifb-os" }
   },
 
   "context": {
@@ -55,8 +55,8 @@
   // Displayed to agents when the example custom integration is enabled in /admin.
   // Reference: docs/customization.md#custom-gatekeepers
   "customGatekeeper": {
-    "name": "<ORGANIZATION_DISPLAY_NAME>",
-    "message": "<ORGANIZATION_GUIDANCE>"
+    "name": "Impact Finance Belgium",
+    "message": "IFB is a membership organisation for impact finance in Belgium. Follow the IFB voice: plain, numerate, British spelling. Anything member-facing is a draft until a human approves it."
   },
 
   // Explicit backend issue reports go to a private Worker that emits structured console errors.
