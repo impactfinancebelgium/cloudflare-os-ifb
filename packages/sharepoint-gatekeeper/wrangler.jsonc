@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "sharepoint-gatekeeper",
+  "main": ".wrangler/validate/src/index.ts",
+  "build": {
+    "command": "pnpm exec capnweb-validate build --out .wrangler/validate",
+    "watch_dir": "src"
+  },
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["allow_irrevocable_stub_storage", "nodejs_compat"],
+  "migrations": [
+    {
+      "tag": "v0",
+      "new_sqlite_classes": ["SharePointGatekeeper"]
+    }
+  ],
+  "vars": {
+    "MS_TENANT_ID": "d0500e85-6240-46af-b5ff-ab7b7fcc5b4a",
+    "MS_CLIENT_ID": "67ce878d-e004-4d6a-b984-113a9c820ab7",
+    "SP_SITE_ID": "impactfinancebelgium.sharepoint.com,1e1541a4-6ab7-43b8-8942-bd2058b907b0,0c4b1506-9f2e-47d2-80e1-623f39b69a6a"
+  },
+  // Secret installed once with `wrangler secret put --name ifb-os-sharepoint-gatekeeper`:
+  // MS_CLIENT_SECRET (the "IFB Workspace" Entra app secret from the IFB vault). The app
+  // permission is Sites.Selected, granted on the IFB site only: other sites are 403 by
+  // construction.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": false }
+  }
+}

@@ -20,7 +20,8 @@
     "scheduler": { "name": "ifb-os-scheduler" },
     "edge": { "name": "ifb-os-edge" },
     "twentyGatekeeper": { "name": "ifb-os-twenty-gatekeeper" },
-    "websiteGatekeeper": { "name": "ifb-os-website-gatekeeper" }
+    "websiteGatekeeper": { "name": "ifb-os-website-gatekeeper" },
+    "sharepointGatekeeper": { "name": "ifb-os-sharepoint-gatekeeper" }
   },
 
   // This starter deploys Cloudflare Access mode. Cloudflare OS also supports built-in password
@@ -89,6 +90,11 @@
   // public website repo; writes only as human-approved review branches. Secret on the
   // worker: WEBSITE_GITHUB_TOKEN (org fine-grained PAT from the IFB vault).
   "websiteGatekeeper": { "enabled": true },
+
+  // IFB: read-only SharePoint gatekeeper (packages/sharepoint-gatekeeper). Graph
+  // client credentials via the "IFB Workspace" Entra app; Sites.Selected confines it
+  // to the IFB site. Secret on the worker: MS_CLIENT_SECRET (IFB vault).
+  "sharepointGatekeeper": { "enabled": true },
 
   "errorReporting": {
     "enabled": true,

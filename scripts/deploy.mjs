@@ -17,6 +17,7 @@ const generatedPaths = {
   edge: join(root, "packages/edge", generatedName),  // IFB: staged Supabase-exit worker
   twentyGatekeeper: join(root, "packages/twenty-gatekeeper", generatedName),  // IFB: CRM read-only
   websiteGatekeeper: join(root, "packages/website-gatekeeper", generatedName),  // IFB: website proposals
+  sharepointGatekeeper: join(root, "packages/sharepoint-gatekeeper", generatedName),  // IFB: docs read-only
 };
 
 const requiredPaths = [
@@ -71,6 +72,11 @@ const websiteGatekeeperPaths = [
   "workers.websiteGatekeeper.name",
 ];
 
+// IFB: the SharePoint read-only gatekeeper is optional too.
+const sharepointGatekeeperPaths = [
+  "workers.sharepointGatekeeper.name",
+];
+
 const resourcePaths = [
   "context.kvNamespaceId",
   "resources.blueprintsKvNamespaceId",
@@ -91,6 +97,7 @@ export function validateConfig(config) {
     ...(config.edge?.enabled ? edgePaths : []),
     ...(config.twentyGatekeeper?.enabled ? twentyGatekeeperPaths : []),
     ...(config.websiteGatekeeper?.enabled ? websiteGatekeeperPaths : []),
+    ...(config.sharepointGatekeeper?.enabled ? sharepointGatekeeperPaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -151,6 +158,7 @@ export function validateConfig(config) {
     .filter(([key]) => key !== "edge" || config.edge?.enabled)
     .filter(([key]) => key !== "twentyGatekeeper" || config.twentyGatekeeper?.enabled)
     .filter(([key]) => key !== "websiteGatekeeper" || config.websiteGatekeeper?.enabled)
+    .filter(([key]) => key !== "sharepointGatekeeper" || config.sharepointGatekeeper?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -282,6 +290,9 @@ export function generateConfigs(config, bases) {
   const websiteGatekeeper = config.websiteGatekeeper?.enabled
     ? structuredClone(bases.websiteGatekeeper)
     : undefined;
+  const sharepointGatekeeper = config.sharepointGatekeeper?.enabled
+    ? structuredClone(bases.sharepointGatekeeper)
+    : undefined;
 
   setCommon(workshop, config, config.workers.workshop.name, config.workers.workshop.route);
   workshop.vars = {
@@ -346,6 +357,11 @@ export function generateConfigs(config, bases) {
       service: config.workers.websiteGatekeeper.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
+    ...(config.sharepointGatekeeper?.enabled ? [{
+      binding: "GATEKEEPER_SHAREPOINT",
+      service: config.workers.sharepointGatekeeper.name,
+      entrypoint: "GatekeeperVendor",
+    }] : []),
   ];
   workshop.kv_namespaces = [
     { binding: "BLUEPRINTS", ...(config.resources.blueprintsKvNamespaceId
@@ -387,6 +403,9 @@ export function generateConfigs(config, bases) {
   if (websiteGatekeeper) {
     setCommon(websiteGatekeeper, config, config.workers.websiteGatekeeper.name);
   }
+  if (sharepointGatekeeper) {
+    setCommon(sharepointGatekeeper, config, config.workers.sharepointGatekeeper.name);
+  }
   if (edge) {
     // workers.dev route so the staged worker is reachable for verification; a live
     // hostname only arrives at cutover.
@@ -404,7 +423,8 @@ export function generateConfigs(config, bases) {
   return { workshop, context, customGatekeeper,
     ...(errorReporter && { errorReporter }), ...(scheduler && { scheduler }),
     ...(edge && { edge }), ...(twentyGatekeeper && { twentyGatekeeper }),
-    ...(websiteGatekeeper && { websiteGatekeeper }) };
+    ...(websiteGatekeeper && { websiteGatekeeper }),
+    ...(sharepointGatekeeper && { sharepointGatekeeper }) };
 }
 
 async function readJsonc(path) {
@@ -460,6 +480,9 @@ function build(config) {
   if (config.websiteGatekeeper?.enabled) {
     run(["--dir", "packages/website-gatekeeper", "run", "build"]);
   }
+  if (config.sharepointGatekeeper?.enabled) {
+    run(["--dir", "packages/sharepoint-gatekeeper", "run", "build"]);
+  }
   run(["--dir", "cloudflare-os", "--filter", "@gadgets/workshop-frontend", "build"], root, {
     ...process.env,
     VITE_CF_ACCESS_MODE: "true",
@@ -479,6 +502,7 @@ async function main() {
     edge: await readJsonc(join(root, "packages/edge/wrangler.jsonc")),
     twentyGatekeeper: await readJsonc(join(root, "packages/twenty-gatekeeper/wrangler.jsonc")),
     websiteGatekeeper: await readJsonc(join(root, "packages/website-gatekeeper/wrangler.jsonc")),
+    sharepointGatekeeper: await readJsonc(join(root, "packages/sharepoint-gatekeeper/wrangler.jsonc")),
   });
 
   try {
@@ -510,6 +534,10 @@ async function main() {
     if (config.websiteGatekeeper?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/website-gatekeeper"));
+    }
+    if (config.sharepointGatekeeper?.enabled) {
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/sharepoint-gatekeeper"));
     }
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));
