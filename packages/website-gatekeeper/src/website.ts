@@ -2,11 +2,11 @@
 // repo (impactfinance-belgium-website) from inside Cloudflare OS. Agents can read
 // the repo freely (recorded observations); the ONLY write path is proposeChange,
 // which queues an action for HUMAN APPROVAL in the OS. Only when approved does
-// applyAction() create the `os/<slug>` review branch and commit the edits; a human
-// still opens and merges the PR on GitHub. The default branch and the deploy
-// pipeline are unreachable from here by construction. Auth: the org fine-grained
-// PAT as a Worker secret (contents read/write; once it gains the pull-request
-// permission this can open draft PRs directly instead of compare URLs).
+// applyAction() commit the edits DIRECTLY TO THE DEFAULT BRANCH, which deploys:
+// Jonas approved this on 2026-08-08 because the site runs on a test domain, not
+// the live impactfinance.be. When the site goes live, flip DIRECT_TO_MAIN back to
+// false and proposals return to review branches + compare URLs. Auth: the org
+// fine-grained PAT as a Worker secret.
 
 import {
   DurableObject,
@@ -47,6 +47,11 @@ const WEBSITE_ICON = {
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_FILES_PER_CHANGE = 20;
 
+// Test-domain mode: approved changes commit straight to the default branch (and
+// deploy). Set to false once impactfinance.be goes live on this repo, to get
+// review branches + compare URLs back.
+const DIRECT_TO_MAIN = true;
+
 type ObservationQueue = Pick<ApprovalQueue, "authorizeObservation" | "submitAction"> &
   Partial<{ [Symbol.dispose](): void }>;
 
@@ -61,7 +66,7 @@ export function describeWebsiteVendor(): VendorDescription {
     color: "#eefaf2",
     tagline: "Propose changes to impactfinance.be",
     description:
-      "Read the public website's source and propose changes. Every proposal needs human approval, lands on a review branch, and a human merges the PR; nothing deploys from here.",
+      "Read the website's source and propose changes. Every proposal needs human approval in the OS; approved changes commit to main and deploy (the site is on a test domain).",
     autoProvisionsAccount: true,
     providesAuth: false,
   };
@@ -171,10 +176,13 @@ export class WebsiteSessionImpl extends RpcTarget implements WebsiteSession {
       title: `Website change: ${title}`,
       description:
         `${description}\n\n**Files:** ${files.map((f) => `\`${f.path}\``).join(", ")}\n\n` +
-        "On approval this creates a review branch on GitHub. A human still opens and merges " +
-        "the pull request; the live site does not change until then.",
-      implementsRevert: true,
-      // Reads don't reflect the pending branch, so let the agent pause until decided.
+        (DIRECT_TO_MAIN
+          ? "On approval this commits straight to the default branch and the test site deploys."
+          : "On approval this creates a review branch on GitHub. A human still opens and merges " +
+            "the pull request; the live site does not change until then."),
+      // Direct-to-main commits can't be cleanly rolled back from here.
+      implementsRevert: !DIRECT_TO_MAIN,
+      // Reads don't reflect the pending change, so let the agent pause until decided.
       awaitDecision: true,
     });
     return { proposalId, status: "pending", title };
@@ -248,22 +256,27 @@ export class WebsiteGatekeeper extends DurableObject<Cloudflare.Env> implements 
     try {
       const repoMeta = (await githubApi(this.env, "")) as { default_branch: string };
       const base = repoMeta.default_branch;
-      const headRef = (await githubApi(this.env, `/git/ref/heads/${base}`)) as { object: { sha: string } };
-      const branch = `os/${slugify(record.title)}-${headRef.object.sha.slice(0, 6)}`;
-      await githubApi(this.env, "/git/refs", "POST", { ref: `refs/heads/${branch}`, sha: headRef.object.sha });
+      let branch = base;
+      if (!DIRECT_TO_MAIN) {
+        const headRef = (await githubApi(this.env, `/git/ref/heads/${base}`)) as { object: { sha: string } };
+        branch = `os/${slugify(record.title)}-${headRef.object.sha.slice(0, 6)}`;
+        await githubApi(this.env, "/git/refs", "POST", { ref: `refs/heads/${branch}`, sha: headRef.object.sha });
+      }
 
+      let lastCommitSha = "";
       for (const file of record.files) {
         const clean = file.path.replace(/^\/+/, "");
         const existing = (await githubApi(
           this.env,
           `/contents/${encodeURI(clean)}?ref=${encodeURIComponent(branch)}`,
         )) as { sha?: string } | null;
-        await githubApi(this.env, `/contents/${encodeURI(clean)}`, "PUT", {
-          message: `${record.title}\n\n${record.description}\n\nProposed from Cloudflare OS (human review required).`,
+        const put = (await githubApi(this.env, `/contents/${encodeURI(clean)}`, "PUT", {
+          message: `${record.title}\n\n${record.description}\n\nApproved in Cloudflare OS.`,
           content: b64encodeUtf8(file.content),
           branch,
           ...(existing?.sha ? { sha: existing.sha } : {}),
-        });
+        })) as { commit?: { sha?: string } };
+        lastCommitSha = put.commit?.sha ?? lastCommitSha;
       }
 
       await this.ctx.storage.put(key, {
@@ -271,7 +284,9 @@ export class WebsiteGatekeeper extends DurableObject<Cloudflare.Env> implements 
         files: undefined,
         status: "applied",
         branch,
-        compareUrl: `https://github.com/${this.env.WEBSITE_REPO}/compare/${base}...${encodeURIComponent(branch)}?expand=1`,
+        compareUrl: DIRECT_TO_MAIN
+          ? `https://github.com/${this.env.WEBSITE_REPO}/commit/${lastCommitSha}`
+          : `https://github.com/${this.env.WEBSITE_REPO}/compare/${base}...${encodeURIComponent(branch)}?expand=1`,
       } satisfies StoredProposal);
     } catch (error) {
       await this.ctx.storage.put(key, {
@@ -295,7 +310,9 @@ export class WebsiteGatekeeper extends DurableObject<Cloudflare.Env> implements 
   async revertAction(action: number): Promise<void> {
     const key = `proposal:${action}`;
     const record = await this.ctx.storage.get<StoredProposal>(key);
-    if (!record?.branch) throw new Error(`Proposal ${action} has no branch to revert.`);
+    if (!record?.branch || record.branch === "main" || DIRECT_TO_MAIN) {
+      throw new Error("Direct-to-main changes are reverted with a new change, not from here.");
+    }
     await githubApi(this.env, `/git/refs/heads/${encodeURIComponent(record.branch)}`, "DELETE");
     await this.ctx.storage.put(key, {
       ...record,
