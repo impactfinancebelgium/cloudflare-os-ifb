@@ -19,6 +19,8 @@ const generatedPaths = {
   websiteGatekeeper: join(root, "packages/website-gatekeeper", generatedName),  // IFB: website proposals
   sharepointGatekeeper: join(root, "packages/sharepoint-gatekeeper", generatedName),  // IFB: docs read-only
   survey: join(root, "packages/survey", generatedName),  // IFB: member survey app (D1)
+  // Upstream "Scheduled Tasks" gatekeeper (agent-registered schedules + the Scheduled app).
+  scheduledTasks: join(root, "cloudflare-os/packages/gatekeeper-scheduler", generatedName),
 };
 
 const requiredPaths = [
@@ -82,6 +84,11 @@ const surveyPaths = [
   "workers.survey.name",
 ];
 
+// Upstream Scheduled Tasks gatekeeper, optional like the rest.
+const scheduledTasksPaths = [
+  "workers.scheduledTasks.name",
+];
+
 const resourcePaths = [
   "context.kvNamespaceId",
   "resources.blueprintsKvNamespaceId",
@@ -104,6 +111,7 @@ export function validateConfig(config) {
     ...(config.websiteGatekeeper?.enabled ? websiteGatekeeperPaths : []),
     ...(config.sharepointGatekeeper?.enabled ? sharepointGatekeeperPaths : []),
     ...(config.survey?.enabled ? surveyPaths : []),
+    ...(config.scheduledTasks?.enabled ? scheduledTasksPaths : []),
   ];
   for (const path of activePaths) {
     const value = valueAt(config, path);
@@ -166,6 +174,7 @@ export function validateConfig(config) {
     .filter(([key]) => key !== "websiteGatekeeper" || config.websiteGatekeeper?.enabled)
     .filter(([key]) => key !== "sharepointGatekeeper" || config.sharepointGatekeeper?.enabled)
     .filter(([key]) => key !== "survey" || config.survey?.enabled)
+    .filter(([key]) => key !== "scheduledTasks" || config.scheduledTasks?.enabled)
     .map(([, worker]) => worker.name);
   if (new Set(workerNames).size !== workerNames.length) {
     throw new Error("Workshop, Context, and custom Gatekeeper Worker names must be unique.");
@@ -300,6 +309,9 @@ export function generateConfigs(config, bases) {
   const sharepointGatekeeper = config.sharepointGatekeeper?.enabled
     ? structuredClone(bases.sharepointGatekeeper)
     : undefined;
+  const scheduledTasks = config.scheduledTasks?.enabled
+    ? structuredClone(bases.scheduledTasks)
+    : undefined;
   const survey = config.survey?.enabled
     ? structuredClone(bases.survey)
     : undefined;
@@ -357,9 +369,17 @@ export function generateConfigs(config, bases) {
       service: config.workers.twentyGatekeeper.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
+    // IFB ops cron table (read-only vendor); "jobs" id so it can't shadow the
+    // upstream Scheduled Tasks vendor below.
     ...(config.scheduler?.enabled ? [{
-      binding: "GATEKEEPER_SCHEDULER",
+      binding: "GATEKEEPER_JOBS",
       service: config.workers.scheduler.name,
+      entrypoint: "GatekeeperVendor",
+    }] : []),
+    // Upstream Scheduled Tasks: agent-registered schedules + the "Scheduled" app.
+    ...(config.scheduledTasks?.enabled ? [{
+      binding: "GATEKEEPER_SCHEDULER",
+      service: config.workers.scheduledTasks.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
     ...(config.websiteGatekeeper?.enabled ? [{
@@ -432,6 +452,9 @@ export function generateConfigs(config, bases) {
   if (sharepointGatekeeper) {
     setCommon(sharepointGatekeeper, config, config.workers.sharepointGatekeeper.name);
   }
+  if (scheduledTasks) {
+    setCommon(scheduledTasks, config, config.workers.scheduledTasks.name);
+  }
   if (edge) {
     // workers.dev route so the staged worker is reachable for verification; a live
     // hostname only arrives at cutover.
@@ -459,7 +482,8 @@ export function generateConfigs(config, bases) {
     ...(edge && { edge }), ...(twentyGatekeeper && { twentyGatekeeper }),
     ...(websiteGatekeeper && { websiteGatekeeper }),
     ...(sharepointGatekeeper && { sharepointGatekeeper }),
-    ...(survey && { survey }) };
+    ...(survey && { survey }),
+    ...(scheduledTasks && { scheduledTasks }) };
 }
 
 async function readJsonc(path) {
@@ -539,6 +563,7 @@ async function main() {
     websiteGatekeeper: await readJsonc(join(root, "packages/website-gatekeeper/wrangler.jsonc")),
     sharepointGatekeeper: await readJsonc(join(root, "packages/sharepoint-gatekeeper/wrangler.jsonc")),
     survey: await readJsonc(join(root, "packages/survey/wrangler.jsonc")),
+    scheduledTasks: await readJsonc(join(root, "cloudflare-os/packages/gatekeeper-scheduler/wrangler.jsonc")),
   });
 
   try {
@@ -579,6 +604,11 @@ async function main() {
       // Before the workshop: it binds GATEKEEPER_SURVEY to this service.
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/survey"));
+    }
+    if (config.scheduledTasks?.enabled) {
+      // Before the workshop: it binds GATEKEEPER_SCHEDULER to this service.
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "cloudflare-os/packages/gatekeeper-scheduler"));
     }
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));
