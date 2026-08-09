@@ -377,8 +377,10 @@ export function generateConfigs(config, bases) {
       entrypoint: "GatekeeperVendor",
     }] : []),
     // Upstream Scheduled Tasks: agent-registered schedules + the "Scheduled" app.
+    // Vendor id "tasks", NOT "scheduler": that id was burned by the IFB cron vendor
+    // (account stubs snapshot per vendor id and are sticky; see the gotchas runbook).
     ...(config.scheduledTasks?.enabled ? [{
-      binding: "GATEKEEPER_SCHEDULER",
+      binding: "GATEKEEPER_TASKS",
       service: config.workers.scheduledTasks.name,
       entrypoint: "GatekeeperVendor",
     }] : []),
@@ -488,7 +490,8 @@ export function generateConfigs(config, bases) {
 
 async function readJsonc(path) {
   const errors = [];
-  const result = parse(await readFile(path, "utf8"), errors);
+  // Trailing commas allowed: upstream monorepo wrangler.jsonc files use them.
+  const result = parse(await readFile(path, "utf8"), errors, { allowTrailingComma: true });
   if (errors.length) {
     const where = relative(root, path) || path;
     throw new Error(`${where}: ${printParseErrorCode(errors[0].error)} at offset ${errors[0].offset}`);
@@ -523,6 +526,10 @@ function requireSubmodule() {
 
 function build(config) {
   run(["--dir", "cloudflare-os", "--filter", "@gadgets/gatekeeper-context", "build"]);
+  if (config.scheduledTasks?.enabled) {
+    // Generates the Scheduled app bundle (generated/app.txt) the worker imports.
+    run(["--dir", "cloudflare-os", "--filter", "@gadgets/gatekeeper-scheduler", "build:app"]);
+  }
   run(["--dir", "packages/custom-gatekeeper", "run", "build"]);
   if (config.errorReporting.enabled) {
     run(["--dir", "packages/error-reporter", "run", "build"]);
