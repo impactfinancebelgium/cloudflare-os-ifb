@@ -1,0 +1,27 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "digest",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat"],
+  // Reachable on workers.dev while it is a team-internal tool. A hostname behind
+  // Cloudflare Access comes when the team starts using it daily.
+  "workers_dev": true,
+  "preview_urls": false,
+  // One object holds the whole stream; it wakes itself hourly via its own alarm,
+  // so this worker needs no cron trigger.
+  "migrations": [
+    { "tag": "v0", "new_sqlite_classes": ["DigestStore"] }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "DIGEST", "class_name": "DigestStore" }
+    ]
+  },
+  // Secret installed with `wrangler secret put --name ifb-digest`:
+  //   BRIEF_TOKEN  (bearer secret for /api/brief, read by the Hermes morning brief)
+  "observability": {
+    "enabled": true,
+    "logs": { "invocation_logs": false }
+  }
+}

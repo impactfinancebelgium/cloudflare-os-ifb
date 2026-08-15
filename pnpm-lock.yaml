@@ -77,6 +77,18 @@ importers:
         specifier: ^4.115.0
         version: 4.118.0(@cloudflare/workers-types@4.20260702.1)
 
+  packages/digest:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260702.1
+        version: 4.20260702.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.115.0
+        version: 4.118.0(@cloudflare/workers-types@4.20260702.1)
+
   packages/edge:
     devDependencies:
       '@cloudflare/workers-types':
@@ -153,6 +165,16 @@ importers:
         version: 4.118.0(@cloudflare/workers-types@4.20260702.1)
 
   packages/survey:
+    dependencies:
+      '@gadgets/workshop-shared':
+        specifier: workspace:*
+        version: link:../../cloudflare-os/packages/workshop-shared
+      capnweb:
+        specifier: ^0.8.0
+        version: 0.8.0
+      capnweb-validate:
+        specifier: 0.2.1
+        version: 0.2.1(capnweb@0.8.0)(esbuild@0.28.1)(rolldown@1.2.2)(rollup@4.62.4)(typescript@5.9.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1))
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20260702.1
