@@ -32,7 +32,7 @@
   // "admins" gates /admin in every sign-in method.
   // Reference: docs/customization.md#sign-in-methods
   "access": {
-    "issuer": "https://aged-cherry-4437.cloudflareaccess.com",
+    "issuer": "https://impactfinance.cloudflareaccess.com",
     "audience": "4c17b3fe12257f08722b9acba9723e3cae8266bf7839bfee3e8909069d68e33a",
     "admins": ["jonas@sparkcollective.be", "lynn@impactfinance.be", "it@impactfinance.be"]
   },
