@@ -552,43 +552,46 @@ async function main() {
       await writeFile(generatedPaths[name], JSON.stringify(generatedConfig, null, 2) + "\n");
     }
     const check = process.argv.includes("--check");
+    const onlyWorkshop = process.argv.includes("--only-workshop");
     if (check) run(["test"]);
     build(config);
     const deployArgs = check ? ["--dry-run"] : [];
-    if (config.errorReporting.enabled) {
+    if (!onlyWorkshop && config.errorReporting.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/error-reporter"));
     }
-    run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
-      join(root, "cloudflare-os/packages/gatekeeper-context"));
-    run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
-      join(root, "packages/custom-gatekeeper"));
-    if (config.twentyGatekeeper?.enabled) {
+    if (!onlyWorkshop) {
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "cloudflare-os/packages/gatekeeper-context"));
+      run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
+        join(root, "packages/custom-gatekeeper"));
+    }
+    if (!onlyWorkshop && config.twentyGatekeeper?.enabled) {
       // Before the workshop: it binds GATEKEEPER_TWENTY to this service.
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/twenty-gatekeeper"));
     }
-    if (config.scheduler?.enabled) {
+    if (!onlyWorkshop && config.scheduler?.enabled) {
       // Also before the workshop: it binds GATEKEEPER_SCHEDULER to this service.
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/scheduler"));
     }
-    if (config.websiteGatekeeper?.enabled) {
+    if (!onlyWorkshop && config.websiteGatekeeper?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/website-gatekeeper"));
     }
-    if (config.sharepointGatekeeper?.enabled) {
+    if (!onlyWorkshop && config.sharepointGatekeeper?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/sharepoint-gatekeeper"));
     }
-    if (config.scheduledTasks?.enabled) {
+    if (!onlyWorkshop && config.scheduledTasks?.enabled) {
       // Before the workshop: it binds GATEKEEPER_SCHEDULER to this service.
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "cloudflare-os/packages/gatekeeper-scheduler"));
     }
     run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
       join(root, "cloudflare-os/packages/workshop-backend"));
-    if (config.edge?.enabled) {
+    if (!onlyWorkshop && config.edge?.enabled) {
       run(["exec", "wrangler", "deploy", "--config", generatedName, ...deployArgs],
         join(root, "packages/edge"));
     }
