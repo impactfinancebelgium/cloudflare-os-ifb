@@ -309,6 +309,11 @@ export class DigestStore extends DurableObject<Cloudflare.Env> {
     return removed;
   }
 
+  /** Drop the one-off FTS5 probe table, if an earlier build created it. */
+  dropProbe(): void {
+    this.#sql.exec("DROP TABLE IF EXISTS fts_probe");
+  }
+
   setState(id: string, state: "kept" | "dropped"): boolean {
     this.#sql.exec("UPDATE items SET state = ? WHERE id = ?", state, id);
     return true;
