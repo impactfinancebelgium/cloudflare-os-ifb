@@ -22,7 +22,6 @@
     "twentyGatekeeper": { "name": "ifb-os-twenty-gatekeeper" },
     "websiteGatekeeper": { "name": "ifb-os-website-gatekeeper" },
     "sharepointGatekeeper": { "name": "ifb-os-sharepoint-gatekeeper" },
-    "survey": { "name": "ifb-os-survey" },
     "scheduledTasks": { "name": "ifb-os-scheduled-tasks" }
   },
 
@@ -90,26 +89,18 @@
 
   // IFB: website change-proposal gatekeeper (packages/website-gatekeeper). Reads the
   // public website repo; writes only as human-approved review branches. Secret on the
-  // worker: WEBSITE_GITHUB_TOKEN (org fine-grained PAT from the IFB vault).
+  // worker: WEBSITE_GITHUB_TOKEN (org fine-grained PAT from the ifb-vault).
   "websiteGatekeeper": { "enabled": true },
 
   // IFB: read-only SharePoint gatekeeper (packages/sharepoint-gatekeeper). Graph
   // client credentials via the "IFB Workspace" Entra app; Sites.Selected confines it
-  // to the IFB site. Secret on the worker: MS_CLIENT_SECRET (IFB vault).
+  // to the IFB site. Secret on the worker: MS_CLIENT_SECRET (ifb-vault).
   "sharepointGatekeeper": { "enabled": true },
 
   // Upstream "Scheduled Tasks" gatekeeper (cloudflare-os/packages/gatekeeper-scheduler):
   // agent-registered schedules + the "Scheduled" sidebar app. Our packages/scheduler
   // stays as the git-defined ops cron table, bound as GATEKEEPER_JOBS.
   "scheduledTasks": { "enabled": true },
-
-  // IFB: member survey app (packages/survey). Worker + D1 `ifb-survey` (region WEUR).
-  // Member auth is signed invite tokens, never Cloudflare Access (per-seat cost).
-  "survey": {
-    "enabled": true,
-    // Member-facing hostname; workers.dev stays active so existing links keep working.
-    "customDomain": "survey.impactfinance.be"
-  },
 
   "errorReporting": {
     "enabled": true,
