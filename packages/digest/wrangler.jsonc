@@ -4,10 +4,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-04",
   "compatibility_flags": ["nodejs_compat"],
-  // Reachable on workers.dev while it is a team-internal tool. A hostname behind
-  // Cloudflare Access comes when the team starts using it daily.
-  "workers_dev": true,
+  // digest.impactfinance.net, behind Cloudflare Access. workers.dev is off: the
+  // admin routes can purge and refetch, so this must never be reachable without a login.
+  "workers_dev": false,
   "preview_urls": false,
+  "routes": [
+    { "pattern": "digest.impactfinance.net", "custom_domain": true }
+  ],
   // One object holds the whole stream; it wakes itself hourly via its own alarm,
   // so this worker needs no cron trigger.
   "migrations": [

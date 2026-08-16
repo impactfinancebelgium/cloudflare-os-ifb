@@ -120,6 +120,18 @@ importers:
         specifier: ^4.115.0
         version: 4.118.0(@cloudflare/workers-types@4.20260702.1)
 
+  packages/hq:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260702.1
+        version: 4.20260702.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.115.0
+        version: 4.118.0(@cloudflare/workers-types@4.20260702.1)
+
   packages/scheduler:
     dependencies:
       '@gadgets/workshop-shared':
