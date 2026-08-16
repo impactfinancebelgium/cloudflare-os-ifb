@@ -1,7 +1,11 @@
 // Staff review page. Self-contained HTML + JS served by the worker. Prompts once for the
 // ADMIN_KEY (kept in localStorage, sent as x-admin-key), lists candidates from /api/candidates
 // with the traffic-light screening, and lets staff move stage/status. Colour rules mirror
-// workflows/internship-recruiting.md. Cloudflare Access will wrap this at cutover.
+// workflows/internship-recruiting/README.md. Cloudflare Access will wrap this at cutover.
+//
+// Styling: minimal, matching the cockpit (Claude look) so the mini apps read as one system:
+// white surfaces, warm-neutral text/borders, a terracotta accent used sparingly. The only
+// strong colour is the traffic light itself.
 
 export function reviewPage(): string {
   return `<!doctype html>
@@ -9,37 +13,51 @@ export function reviewPage(): string {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IFB Recruiting</title>
 <style>
-  :root{--navy:#113F5E;--gold:#D3C388;--coral:#F15D49;--ink:#1b1b1b;--muted:#6b7280;
-    --green:#2e7d57;--orange:#b8722e;--red:#b3402a;--line:#e6e4df;--paper:#faf9f6;}
-  *{box-sizing:border-box} body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--paper)}
-  header{background:var(--navy);color:#fff;padding:18px 22px} header h1{margin:0;font-size:19px}
-  header p{margin:2px 0 0;font-size:13px;color:#cdd8e0}
-  main{max-width:1040px;margin:0 auto;padding:20px 22px 60px}
+  :root{
+    --bg:#faf9f5; --card:#fff; --fg:#3d3929; --card-fg:#141413; --muted:#83827d;
+    --border:#e7e5de; --secondary:#e9e6dc; --secondary-fg:#28261b; --accent:#c96442;
+    --radius:8px; --green:#2e7d57; --orange:#b8722e; --red:#b3402a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
+  main{max-width:1000px;margin:0 auto;padding:26px 22px 64px}
+  h1{margin:0;font-size:21px;font-weight:600;letter-spacing:-.01em;color:var(--card-fg)}
+  .sub{margin:3px 0 18px;font-size:13px;color:var(--muted)}
+  input,select,button{font:inherit;color:inherit}
+  input,select{padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:#fff;outline:none}
+  input:focus,select:focus{border-color:#cdcabf}
+  button{padding:6px 11px;border:1px solid var(--border);border-radius:7px;background:#fff;cursor:pointer}
+  button:hover{background:var(--secondary)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.primary:hover{background:#b4552d}
   .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-  input,select,button{font:inherit} input,select{padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fff}
-  button{padding:7px 12px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer}
-  button.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
-  .chip{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff;cursor:pointer;font-size:13px}
-  .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
-  .card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:14px 16px;margin-bottom:11px}
+  .chip{border:1px solid var(--border);border-radius:999px;padding:4px 11px;background:#fff;cursor:pointer;font-size:13px}
+  .chip:hover{background:var(--secondary)}
+  .chip.on{background:var(--secondary);border-color:var(--secondary);color:var(--secondary-fg);font-weight:500}
+  .card{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:13px 15px;margin-bottom:9px}
   .row1{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  .name{font-weight:700} .email{color:var(--muted);font-size:13px}
+  .name{font-weight:600;color:var(--card-fg)} .email{color:var(--muted);font-size:12.5px}
   .spacer{margin-left:auto;display:flex;gap:8px;align-items:center}
-  .pos{color:var(--muted);font-size:13px;margin-top:1px}
-  .lights{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12.5px}
-  .l{display:inline-flex;align-items:center;gap:5px} .dot{width:9px;height:9px;border-radius:50%}
-  .verdict{border:1px solid;border-radius:6px;padding:2px 8px;font-size:12.5px;font-weight:600}
-  .stage{background:#f1efe9;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12.5px;text-transform:capitalize}
-  .cmt{color:var(--muted);font-size:13px;margin-top:9px}
-  a.cv{color:var(--navy);font-size:13px} .muted{color:var(--muted)}
-  #login{max-width:360px;margin:60px auto;text-align:center}
+  .stage-sel{padding:4px 8px;font-size:12.5px;text-transform:capitalize}
+  .verdict{border:1px solid;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:500}
+  .pos{color:var(--muted);font-size:12.5px;margin-top:2px}
+  a.cv{color:var(--accent);text-decoration:none} a.cv:hover{text-decoration:underline}
+  .lights{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:11px;font-size:12px}
+  .l{display:inline-flex;align-items:center;gap:5px} .dot{width:8px;height:8px;border-radius:50%}
+  .cmt{color:var(--muted);font-size:12.5px;margin-top:9px}
+  .empty{color:var(--muted);font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;padding:14px 15px}
+  #login{max-width:340px;margin:84px auto;text-align:center}
+  #login .row{display:flex;gap:8px;margin-top:12px}
 </style></head><body>
-<header><h1>IFB Recruiting</h1><p>Candidate review, screening and pipeline</p></header>
 <main>
+  <h1>Recruiting</h1>
+  <p class="sub" id="sub">Candidate review, screening and pipeline</p>
   <div id="login" style="display:none">
-    <p class="muted">Enter the review key to continue.</p>
-    <div style="display:flex;gap:8px"><input id="key" type="password" placeholder="Review key" style="flex:1">
+    <p style="color:var(--muted);margin:0">Enter the review key to continue.</p>
+    <div class="row"><input id="key" type="password" placeholder="Review key" style="flex:1">
     <button class="primary" onclick="saveKey()">Enter</button></div>
+    <p id="loginerr" style="color:var(--red);font-size:13px"></p>
   </div>
   <div id="app" style="display:none">
     <div class="bar">
@@ -63,7 +81,7 @@ const studyL=m=>m===1?"green":m===0?"orange":"neutral";
 const countryL=c=>!c?"neutral":isBE(c)?"green":hasAny(c,EU_C)?"orange":"red";
 const natL=(n,c)=>!n?"neutral":hasAny(n,EU_N)?"green":isBE(c)?"orange":"red";
 const scoreL=s=>s==="good"?"green":s==="maybe"?"orange":s==="not_good"?"red":"neutral";
-const COL={green:"#2e7d57",orange:"#b8722e",red:"#b3402a",neutral:"#6b7280"};
+const COL={green:"#2e7d57",orange:"#b8722e",red:"#b3402a",neutral:"#83827d"};
 const STAGES=["applied","cv_screen","interview_1","interview_2","decision"];
 let DATA=[],KEY=localStorage.getItem("ifb_rec_key")||"",FILT=null;
 
@@ -71,7 +89,7 @@ function api(path,opts={}){return fetch(path,{...opts,headers:{"x-admin-key":KEY
 function saveKey(){KEY=document.getElementById("key").value.trim();localStorage.setItem("ifb_rec_key",KEY);load();}
 function logout(){localStorage.removeItem("ifb_rec_key");KEY="";show();}
 function show(){document.getElementById("login").style.display=KEY?"none":"block";document.getElementById("app").style.display=KEY?"block":"none";}
-async function load(){show();if(!KEY)return;const r=await api("/api/candidates");if(r.status===403){KEY="";localStorage.removeItem("ifb_rec_key");show();document.getElementById("login").insertAdjacentHTML("beforeend","<p style='color:#b3402a'>Wrong key.</p>");return;}const d=await r.json();DATA=d.candidates||[];renderFilters();render();}
+async function load(){show();if(!KEY)return;const r=await api("/api/candidates");if(r.status===403){KEY="";localStorage.removeItem("ifb_rec_key");show();document.getElementById("loginerr").textContent="Wrong key.";return;}const d=await r.json();DATA=d.candidates||[];document.getElementById("sub").textContent=DATA.length+" candidates, with the screening status";renderFilters();render();}
 function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function light(l,label){return '<span class="l" style="color:'+COL[l]+'"><span class="dot" style="background:'+COL[l]+'"></span>'+esc(label)+'</span>';}
 function renderFilters(){const m={};DATA.forEach(c=>{const s=c.stage||"applied";m[s]=(m[s]||0)+1});
@@ -81,12 +99,12 @@ function setF(s){FILT=s;renderFilters();render();}
 function render(){const q=(document.getElementById("q").value||"").toLowerCase();
   let list=DATA.filter(c=>(!FILT||(c.stage||"applied")===FILT));
   if(q)list=list.filter(c=>((c.first_name||"")+" "+(c.last_name||"")+" "+(c.email||"")+" "+(c.university||"")).toLowerCase().includes(q));
-  document.getElementById("list").innerHTML=list.map(card).join("")||'<p class="muted">No candidates.</p>';}
+  document.getElementById("list").innerHTML=list.map(card).join("")||'<div class="empty">No candidates yet. Applications from the website careers form appear here.</div>';}
 function d(v){return v&&String(v).trim()?esc(v):"-";}
 function card(c){const name=esc(((c.first_name||"")+" "+(c.last_name||"")).trim()||"Unnamed");const sl=scoreL(c.score);
   const verdict=c.score==="good"?"Good":c.score==="maybe"?"Maybe":c.score==="not_good"?"Not good":"Unscored";
   return '<div class="card"><div class="row1"><span class="name">'+name+'</span><span class="email">'+d(c.email)+'</span>'+
-    '<span class="spacer"><select onchange="patch(\\''+c.id+'\\',\\'stage\\',this.value)">'+STAGES.map(s=>'<option '+((c.stage||"applied")===s?"selected":"")+'>'+s+'</option>').join('')+'</select>'+
+    '<span class="spacer"><select class="stage-sel" onchange="patch(\\''+c.id+'\\',\\'stage\\',this.value)">'+STAGES.map(s=>'<option '+((c.stage||"applied")===s?"selected":"")+'>'+s+'</option>').join('')+'</select>'+
     '<span class="verdict" style="color:'+COL[sl]+';border-color:'+COL[sl]+'">'+verdict+'</span></span></div>'+
     '<div class="pos">'+d(c.position_applied)+(c.cv_key?' &middot; <a class="cv" href="/cv/'+c.id+'?k='+encodeURIComponent(KEY)+'" target="_blank">CV</a>':'')+'</div>'+
     '<div class="lights">'+
