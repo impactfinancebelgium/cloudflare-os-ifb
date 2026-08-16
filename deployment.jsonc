@@ -12,7 +12,7 @@
       // Production: use a hostname in an active Cloudflare zone. Wrangler creates DNS and TLS.
       // Evaluation: replace this with "route": { "workersDev": true }.
       // https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
-      "route": { "customDomain": "os.impactfinance.be" }
+      "route": { "customDomain": "cloudflare-os.impactfinance.net" }
     },
     "context": { "name": "ifb-os-context" },
     "customGatekeeper": { "name": "ifb-os-gatekeeper" },
@@ -32,7 +32,7 @@
   // Reference: docs/customization.md#sign-in-methods
   "access": {
     "issuer": "https://impactfinance.cloudflareaccess.com",
-    "audience": "4c17b3fe12257f08722b9acba9723e3cae8266bf7839bfee3e8909069d68e33a",
+    "audience": "3f480d67b1520e678c863418b978ae0a09d0a8a24bd1a638924c94490ea3f7da",
     "admins": ["jonas@sparkcollective.be", "lynn@impactfinance.be", "it@impactfinance.be"]
   },
 
